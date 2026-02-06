@@ -12,6 +12,14 @@ import {
   applyPatmosDecision,
   getNextObstacle,
 } from "@/lib/simulation";
+import {
+  computePatmosTiming,
+  computeNormalTiming,
+  cyclesToSimDelayMs,
+  AVOIDANCE_TASK,
+  NOOP_TASK,
+  type TimingResult,
+} from "@/lib/timing-model";
 
 const FIXED_DT = 1 / 60;
 
@@ -24,6 +32,7 @@ export interface ObstacleTimingEvent {
   reactionMs: number;
   action: string;
   cycles: number;
+  timing: TimingResult; // full breakdown from timing model
 }
 
 export interface DualSimState {
@@ -40,7 +49,7 @@ function buildDecision(
   obsIdx: number,
   config: SimulationConfig,
   mode: "patmos" | "normal"
-): { result: PatmosResponse; delayMs: number } {
+): { result: PatmosResponse; delayMs: number; timing: TimingResult } {
   const obstacle = simState.obstacles[obsIdx];
   const dist = obstacle.y - simState.car.y;
   const car = simState.car;
@@ -48,31 +57,32 @@ function buildDecision(
   const sameLane = Math.abs(car.x - obstacle.x) < config.laneWidth * 0.4;
   let action: "steer" | "brake" | "none" = "none";
   let targetLane = car.lane;
-  let baseCycles = 124;
+  let task = NOOP_TASK;
   let execPath = "branch_C: no obstacle in lane";
 
   if (sameLane && dist > 0 && dist < config.detectionThreshold) {
+    task = AVOIDANCE_TASK;
     if (car.lane === 0) {
       action = "steer";
       targetLane = 1;
-      baseCycles = 542;
       execPath = "branch_A: steer right";
     } else {
       action = "steer";
       targetLane = 0;
-      baseCycles = 542;
       execPath = "branch_A: steer left";
     }
   }
 
-  let cycles = baseCycles;
-  let delayMs = 5; // Patmos: deterministic 5 ms
+  // ── Apply timing model ──
+  const timing = mode === "patmos"
+    ? computePatmosTiming(task)
+    : computeNormalTiming(task);
+
+  const delayMs = cyclesToSimDelayMs(timing, mode);
 
   if (mode === "normal") {
-    const jitter = Math.floor(baseCycles * 0.15 + Math.random() * baseCycles * 0.35);
-    cycles = baseCycles + jitter;
-    delayMs = 80 + Math.floor(Math.random() * 170); // 80-250 ms
-    execPath += " (+ cache/pipeline jitter)";
+    const { breakdown: b } = timing;
+    execPath += ` (+${b.cachePenalty}cyc cache, +${b.branchPenalty}cyc branch, +${b.osPenalty}cyc OS)`;
   }
 
   return {
@@ -80,13 +90,14 @@ function buildDecision(
       action,
       target_lane: targetLane,
       brake_force: 0,
-      cycles_used: cycles,
-      deadline_cycles: 800,
-      deadline_met: cycles <= 800,
+      cycles_used: timing.cycles,
+      deadline_cycles: task.deadline_cycles,
+      deadline_met: timing.deadlineMet,
       execution_path: execPath,
       timestamp: Date.now(),
     },
     delayMs,
+    timing,
   };
 }
 
@@ -122,7 +133,7 @@ export function useDualSimulation(config: SimulationConfig = DEFAULT_CONFIG) {
     (mode: "patmos" | "normal", obsIdx: number) => {
       const cfg = configRef.current;
       const sim = mode === "patmos" ? simRef.current.patmos : simRef.current.normal;
-      const { result, delayMs } = buildDecision(sim, obsIdx, cfg, mode);
+      const { result, delayMs, timing } = buildDecision(sim, obsIdx, cfg, mode);
 
       setTimeout(() => {
         const s = simRef.current;
@@ -141,6 +152,7 @@ export function useDualSimulation(config: SimulationConfig = DEFAULT_CONFIG) {
           reactionMs: delayMs,
           action: result.action,
           cycles: result.cycles_used,
+          timing,
         };
 
         if (mode === "patmos") {
