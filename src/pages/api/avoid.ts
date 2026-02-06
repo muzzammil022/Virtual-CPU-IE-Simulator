@@ -2,24 +2,18 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { PatmosRequest, PatmosResponse, TimingComparison } from "@/lib/types";
 
 /**
- * Mock Patmos API endpoint.
+ * Patmos obstacle avoidance endpoint (mock).
  *
- * In production, this proxies to a FastAPI backend that runs:
- *   echo "<distance> <speed> <lane>" | pasim control.elf
- *
- * For now, we simulate the deterministic decision and cycle count.
- * The mock faithfully represents what the Patmos controller would do:
- *   - Same input → same output → same cycle count
- *   - No randomness, no non-determinism
+ * Uses a deterministic mock that mirrors what Patmos would compute.
+ * All timing values simulate real Patmos behavior.
  */
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<PatmosResponse & { timingComparison: TimingComparison }>
 ) {
   if (req.method !== "POST") {
     return res.status(405).end();
   }
-
   const { distance, speed, lane, deadline_cycles } = req.body as PatmosRequest;
 
   // === Deterministic control logic (mirrors control.c) ===
@@ -83,19 +77,20 @@ export default function handler(
     predictabilityGain: normalJitter > 0 ? normalJitter : 1,
   };
 
-  setTimeout(() => {
-    res.status(200).json({
-      action,
-      target_lane,
-      brake_force,
-      cycles_used,
-      deadline_cycles,
-      deadline_met,
-      execution_path,
-      timestamp: Date.now(),
-      timingComparison,
-    });
-  }, Math.min(latency, 200));
+  // Simulate pasim execution latency
+  await new Promise((resolve) => setTimeout(resolve, Math.min(latency, 200)));
+
+  return res.status(200).json({
+    action,
+    target_lane,
+    brake_force,
+    cycles_used,
+    deadline_cycles,
+    deadline_met,
+    execution_path,
+    timestamp: Date.now(),
+    timingComparison,
+  });
 }
 
 /**

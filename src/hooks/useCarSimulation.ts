@@ -12,6 +12,7 @@ import {
   shouldTriggerPatmos,
   applyPatmosDecision,
   getDistanceToObstacle,
+  getNextObstacle,
 } from "@/lib/simulation";
 
 const FIXED_DT = 1 / 60; // 60fps fixed timestep
@@ -23,7 +24,8 @@ export function useCarSimulation(config: SimulationConfig = DEFAULT_CONFIG) {
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const accumulatorRef = useRef<number>(0);
-  const patmosTriggeredRef = useRef(false);
+  // Track which obstacles we already triggered Patmos for (by index)
+  const triggeredObstaclesRef = useRef<Set<number>>(new Set());
 
   const callPatmosAPI = useCallback(
     async (simState: SimulationState) => {
@@ -80,16 +82,23 @@ export function useCarSimulation(config: SimulationConfig = DEFAULT_CONFIG) {
           current = stepSimulation(current, FIXED_DT, config);
           accumulatorRef.current -= FIXED_DT;
 
-          // Check Patmos trigger
-          if (shouldTriggerPatmos(current, config) && !patmosTriggeredRef.current) {
-            patmosTriggeredRef.current = true;
-            current = {
-              ...current,
-              status: "patmos-triggered",
-              triggerDistance: getDistanceToObstacle(current.car, current.obstacles),
-            };
-            // Fire async call (outside of setState)
-            setTimeout(() => callPatmosAPI(current), 0);
+          // Check Patmos trigger for next obstacle in path
+          if (shouldTriggerPatmos(current, config)) {
+            const next = getNextObstacle(current, config);
+            if (next) {
+              // Find the index of this obstacle
+              const obsIdx = current.obstacles.indexOf(next.obstacle);
+              if (obsIdx >= 0 && !triggeredObstaclesRef.current.has(obsIdx)) {
+                triggeredObstaclesRef.current.add(obsIdx);
+                current = {
+                  ...current,
+                  status: "patmos-triggered",
+                  triggerDistance: next.distance,
+                };
+                // Fire async call (outside of setState)
+                setTimeout(() => callPatmosAPI(current), 0);
+              }
+            }
           }
         }
 
@@ -108,7 +117,7 @@ export function useCarSimulation(config: SimulationConfig = DEFAULT_CONFIG) {
     }));
     lastTimeRef.current = 0;
     accumulatorRef.current = 0;
-    patmosTriggeredRef.current = false;
+    triggeredObstaclesRef.current = new Set();
     rafRef.current = requestAnimationFrame(loop);
   }, [loop]);
 
@@ -116,7 +125,16 @@ export function useCarSimulation(config: SimulationConfig = DEFAULT_CONFIG) {
     cancelAnimationFrame(rafRef.current);
     lastTimeRef.current = 0;
     accumulatorRef.current = 0;
-    patmosTriggeredRef.current = false;
+    triggeredObstaclesRef.current = new Set();
+    setState(createInitialState(config));
+  }, [config]);
+
+  // Re-create state when config changes (obstacles / difficulty)
+  useEffect(() => {
+    cancelAnimationFrame(rafRef.current);
+    lastTimeRef.current = 0;
+    accumulatorRef.current = 0;
+    triggeredObstaclesRef.current = new Set();
     setState(createInitialState(config));
   }, [config]);
 

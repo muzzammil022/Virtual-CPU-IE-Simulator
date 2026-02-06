@@ -7,6 +7,7 @@ interface RoadCanvasProps {
   config?: SimulationConfig;
   width?: number;
   height?: number;
+  carColor?: string;
 }
 
 const CANVAS_WIDTH = 320;
@@ -17,6 +18,7 @@ export default function RoadCanvas({
   config = DEFAULT_CONFIG,
   width = CANVAS_WIDTH,
   height = CANVAS_HEIGHT,
+  carColor = "#219ebc",
 }: RoadCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -130,7 +132,7 @@ export default function RoadCanvas({
       ctx.fill();
 
       // Car body
-      ctx.fillStyle = status === "collision" ? "#ff0000" : "#219ebc";
+      ctx.fillStyle = status === "collision" ? "#ff0000" : carColor;
       ctx.beginPath();
       ctx.roundRect(cx, cy, carWidth, carHeight, 6);
       ctx.fill();
@@ -180,7 +182,7 @@ export default function RoadCanvas({
       ctx.textAlign = "right";
       ctx.fillText(`${Math.round(car.speed)} px/s`, width - 14, height - 16);
     },
-    [state, config, width, height]
+    [state, config, width, height, carColor]
   );
 
   useEffect(() => {

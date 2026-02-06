@@ -17,6 +17,8 @@ export interface Obstacle {
   height: number;
 }
 
+export type Difficulty = "easy" | "hard";
+
 export interface SimulationConfig {
   roadLength: number; // total road distance
   laneWidth: number; // pixels per lane
@@ -25,16 +27,25 @@ export interface SimulationConfig {
   initialSpeed: number;
   brakeDeceleration: number;
   laneChangeSpeed: number; // how fast lane change animates
+  numObstacles: number; // 1-5
+  difficulty: Difficulty;
 }
+
+export const DIFFICULTY_PRESETS: Record<Difficulty, { speed: number; detectionThreshold: number; brakeDeceleration: number }> = {
+  easy: { speed: 120, detectionThreshold: 250, brakeDeceleration: 350 },
+  hard: { speed: 220, detectionThreshold: 150, brakeDeceleration: 250 },
+};
 
 export const DEFAULT_CONFIG: SimulationConfig = {
   roadLength: 2000,
   laneWidth: 120,
   numLanes: 2,
-  detectionThreshold: 200, // pixels
-  initialSpeed: 150, // pixels per second
-  brakeDeceleration: 300,
+  detectionThreshold: 250, // pixels
+  initialSpeed: 120, // pixels per second
+  brakeDeceleration: 350,
   laneChangeSpeed: 4,
+  numObstacles: 1,
+  difficulty: "easy",
 };
 
 // === Patmos API Types ===

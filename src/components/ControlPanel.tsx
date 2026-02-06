@@ -19,6 +19,7 @@ export default function ControlPanel({
 
   return (
     <div className="flex flex-col gap-3 w-full max-w-sm">
+      {/* Play Controls */}
       <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
         <h3 className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-4">
           Simulation Controls
@@ -62,7 +63,7 @@ export default function ControlPanel({
             <span className="text-blue-400">1.</span> Car moves forward at fixed timestep (browser)
           </p>
           <p>
-            <span className="text-yellow-400">2.</span> Obstacle enters detection zone (200px)
+            <span className="text-yellow-400">2.</span> Obstacle enters detection zone
           </p>
           <p>
             <span className="text-orange-400">3.</span> State vector sent to Patmos controller
@@ -71,7 +72,7 @@ export default function ControlPanel({
             <span className="text-green-400">4.</span> Deterministic decision returned with cycle count
           </p>
           <p>
-            <span className="text-purple-400">5.</span> Car executes avoidance maneuver
+            <span className="text-purple-400">5.</span> Car executes avoidance, then resumes for next
           </p>
         </div>
       </div>

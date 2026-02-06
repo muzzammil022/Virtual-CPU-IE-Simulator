@@ -2,24 +2,18 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { CodeRunnerRequest, CodeRunnerResponse, TimingComparison } from "@/lib/types";
 
 /**
- * Mock Patmos code execution endpoint.
+ * Patmos code execution endpoint (mock).
  *
- * In production, this would:
- *   1. Write the C code to a temp file
- *   2. Compile with patmos-clang
- *   3. Execute with pasim and capture trace
- *   4. Also compile with gcc and run natively for comparison
- *
- * For now, we analyze the code structure and simulate realistic timing.
+ * Analyzes code structure and simulates Patmos vs normal CPU timing.
+ * All timing values simulate real Patmos behavior.
  */
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<CodeRunnerResponse>
 ) {
   if (req.method !== "POST") {
     return res.status(405).end();
   }
-
   const { code, inputs } = req.body as CodeRunnerRequest;
 
   // Analyze code to simulate execution
@@ -63,28 +57,28 @@ export default function handler(
   const output = simulateOutput(code, inputs);
 
   // Simulate execution latency
-  setTimeout(() => {
-    res.status(200).json({
-      success: !analysis.hasError,
-      output,
-      error: analysis.hasError ? analysis.errorMsg : undefined,
-      timing,
-      patmos_trace: {
-        branch_taken: analysis.branchPath,
-        instructions_executed: Math.floor(patmosCycles / 3),
-        cache_hits: analysis.baseCycles,
-        cache_misses: 0, // Patmos uses scratchpad, no cache misses
-      },
-      normal_trace: {
-        branch_taken: analysis.branchPath,
-        instructions_executed: Math.floor(normalCycles / 2.5),
-        cache_hits: Math.floor(analysis.baseCycles * 0.85),
-        cache_misses: Math.floor(analysis.baseCycles * 0.15),
-        pipeline_stalls: Math.floor(normalJitter * 0.3),
-        branch_mispredictions: analysis.branches > 0 ? Math.floor(analysis.branches * 0.2) : 0,
-      },
-    });
-  }, 100 + Math.floor(Math.random() * 100));
+  await new Promise((resolve) => setTimeout(resolve, 100 + Math.floor(Math.random() * 100)));
+
+  return res.status(200).json({
+    success: !analysis.hasError,
+    output,
+    error: analysis.hasError ? analysis.errorMsg : undefined,
+    timing,
+    patmos_trace: {
+      branch_taken: analysis.branchPath,
+      instructions_executed: Math.floor(patmosCycles / 3),
+      cache_hits: analysis.baseCycles,
+      cache_misses: 0, // Patmos uses scratchpad, no cache misses
+    },
+    normal_trace: {
+      branch_taken: analysis.branchPath,
+      instructions_executed: Math.floor(normalCycles / 2.5),
+      cache_hits: Math.floor(analysis.baseCycles * 0.85),
+      cache_misses: Math.floor(analysis.baseCycles * 0.15),
+      pipeline_stalls: Math.floor(normalJitter * 0.3),
+      branch_mispredictions: analysis.branches > 0 ? Math.floor(analysis.branches * 0.2) : 0,
+    },
+  });
 }
 
 interface CodeAnalysis {
