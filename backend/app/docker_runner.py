@@ -34,51 +34,73 @@ def _write_code_to_tempfile(code: str) -> str:
 
 def _parse_pasim_stats(output: str) -> dict:
     """
-    Parse pasim's statistics output.
-    pasim prints stats to stderr like:
+    Parse pasim's or patemu's statistics output.
+    Both tools print stats to stderr like:
       Cycles: 12345
       Instructions: 9876
-      ...
+      Bundles: 654
+      Cache Hits: 432
+      Cache Misses: 10
+      Method Cache Hits: 400
+      Method Cache Misses: 2
+      Stack Cache Spills: 5
+    
+    This function is flexible with formatting and handles various case/spacing variations.
     """
     stats = {}
 
-    # Cycle count
-    m = re.search(r"Cycles\s*:\s*(\d+)", output)
-    if m:
-        stats["cycles"] = int(m.group(1))
+    # Normalize output: lowercase for case-insensitive matching, extra whitespace
+    normalized = output.lower()
 
-    # Instructions
-    m = re.search(r"Instructions\s*:\s*(\d+)", output)
-    if m:
-        stats["instructions"] = int(m.group(1))
+    # Cycle count (try multiple patterns)
+    for pattern in [r"cycles?\s*:\s*(\d+)", r"total\s+cycles?\s*:\s*(\d+)"]:
+        m = re.search(pattern, normalized)
+        if m:
+            stats["cycles"] = int(m.group(1))
+            break
 
-    # Bundle count (VLIW bundles)
-    m = re.search(r"Bundles\s*:\s*(\d+)", output)
-    if m:
-        stats["bundles"] = int(m.group(1))
+    # Instructions (dynamic/instruction count)
+    for pattern in [r"instructions?\s*:\s*(\d+)", r"dynamic\s+instructions?\s*:\s*(\d+)"]:
+        m = re.search(pattern, normalized)
+        if m:
+            stats["instructions"] = int(m.group(1))
+            break
 
-    # Cache stats
-    m = re.search(r"Cache Hits\s*:\s*(\d+)", output)
+    # Bundle count (VLIW bundles/words)
+    for pattern in [r"bundles?\s*:\s*(\d+)", r"instruction\s+words?\s*:\s*(\d+)"]:
+        m = re.search(pattern, normalized)
+        if m:
+            stats["bundles"] = int(m.group(1))
+            break
+
+    # Cache stats (data cache)
+    m = re.search(r"cache\s+hits?\s*:\s*(\d+)", normalized)
     if m:
         stats["cache_hits"] = int(m.group(1))
 
-    m = re.search(r"Cache Misses\s*:\s*(\d+)", output)
+    m = re.search(r"cache\s+misses?\s*:\s*(\d+)", normalized)
     if m:
         stats["cache_misses"] = int(m.group(1))
 
-    # Method cache
-    m = re.search(r"Method Cache Hits\s*:\s*(\d+)", output)
+    # Method cache (instruction cache)
+    m = re.search(r"method\s+cache\s+hits?\s*:\s*(\d+)", normalized)
     if m:
         stats["method_cache_hits"] = int(m.group(1))
 
-    m = re.search(r"Method Cache Misses\s*:\s*(\d+)", output)
+    m = re.search(r"method\s+cache\s+misses?\s*:\s*(\d+)", normalized)
     if m:
         stats["method_cache_misses"] = int(m.group(1))
 
-    # Stack cache
-    m = re.search(r"Stack Cache (?:Spills|fills)\s*:\s*(\d+)", output, re.IGNORECASE)
-    if m:
-        stats["stack_cache_ops"] = int(m.group(1))
+    # Stack cache (spills/fills/operations)
+    for pattern in [
+        r"stack\s+cache\s+spills?\s*:\s*(\d+)",
+        r"stack\s+cache\s+fills?\s*:\s*(\d+)",
+        r"stack\s+cache\s+(?:operations?|ops?)\s*:\s*(\d+)",
+    ]:
+        m = re.search(pattern, normalized)
+        if m:
+            stats["stack_cache_ops"] = int(m.group(1))
+            break
 
     return stats
 
@@ -142,8 +164,10 @@ def run_on_patmos(
     )
 
     if mode == "emulate":
-        full_cmd += "patemu /tmp/main 2>/tmp/run_stats; "
+        # patemu: cycle-accurate emulator; -v enables verbose stats output
+        full_cmd += "patemu -v /tmp/main 2>/tmp/run_stats; "
     else:
+        # pasim: fast simulator; -V enables detailed statistics
         full_cmd += "pasim -V /tmp/main 2>/tmp/run_stats; "
 
     full_cmd += (

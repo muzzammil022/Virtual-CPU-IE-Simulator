@@ -60,9 +60,15 @@ RUN mkdir -p /root/t-crest && \
     cd misc && \
     ./build.sh -q -m -j1
 
-# Verify tools are available
-RUN which patmos-clang && patmos-clang --version || true
-RUN which pasim || true
+# Verify all required tools are available
+RUN which patmos-clang && echo "✓ patmos-clang found" || (echo "✗ patmos-clang NOT found" && exit 1)
+RUN which pasim && echo "✓ pasim found" || (echo "✗ pasim NOT found" && exit 1)
+RUN which patemu && echo "✓ patemu found" || (echo "✗ patemu NOT found" && exit 1)
+
+# Test basic compilation
+RUN echo 'int main() { return 0; }' > /tmp/test.c && \
+    patmos-clang -O2 /tmp/test.c -o /tmp/test && \
+    echo "✓ Test compilation succeeded" || (echo "✗ Test compilation failed" && exit 1)
 
 # ── 4. Non-root runner user for safety ──
 RUN useradd -m runner && \

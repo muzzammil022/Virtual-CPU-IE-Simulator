@@ -19,6 +19,7 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 const CarDemo = dynamic(() => import("@/components/CarDemo"), { ssr: false });
 const RadarDashboard = dynamic(() => import("@/components/RadarDashboard"), { ssr: false });
+const FPSModule = dynamic(() => import("@/components/FPSModule"), { ssr: false });
 
 // ── GitHub Dark Theme for Monaco ──────────────────────────────────
 
@@ -90,6 +91,7 @@ export default function PatmosIDE() {
   const [btmH, setBtmH] = useState(200);
   const [carDemo, setCarDemo] = useState(false);
   const [radarView, setRadarView] = useState(false);
+  const [fpsView, setFpsView] = useState(false);
 
   // ── Execution ──
   const [running, setRunning] = useState(false);
@@ -336,7 +338,14 @@ export default function PatmosIDE() {
           label="Radar"
           tip="WebSocket radar dashboard"
           on={radarView}
-          click={() => { setRadarView((v) => !v); setCarDemo(false); }}
+          click={() => { setRadarView((v) => !v); setCarDemo(false); setFpsView(false); }}
+        />
+        <TB
+          icon="📹"
+          label="FPS"
+          tip="Image processing benchmark"
+          on={fpsView}
+          click={() => { setFpsView((v) => !v); setCarDemo(false); setRadarView(false); }}
         />
         <TB
           icon="⊞"
@@ -530,11 +539,22 @@ export default function PatmosIDE() {
                 </button>
               </div>
             )}
+            {fpsView && (
+              <div className="flex items-center gap-2 h-full px-3 text-xs cursor-default border-r border-[#21262d] shrink-0 bg-[#0d1117] text-[#e6edf3] border-t-2 border-t-[#d2a8ff]">
+                📹 FPS Module
+                <button
+                  onClick={() => setFpsView(false)}
+                  className="ml-1 text-[#484f58] hover:text-[#e6edf3] text-[10px]"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             <div className="flex-1 bg-[#010409]" />
           </div>
 
           {/* Breadcrumb (editor only) */}
-          {!carDemo && !radarView && activeFile && (
+          {!carDemo && !radarView && !fpsView && activeFile && (
             <div className="flex items-center h-6 px-3 bg-[#0d1117] border-b border-[#21262d] text-[11px] text-[#8b949e] shrink-0">
               <span className="text-[#484f58]">
                 {activeFile.isSample ? "samples" : "files"}
@@ -546,7 +566,9 @@ export default function PatmosIDE() {
 
           {/* Content area */}
           <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-            {radarView ? (
+            {fpsView ? (
+              <FPSModule />
+            ) : radarView ? (
               <RadarDashboard />
             ) : carDemo ? (
               <div className="h-full overflow-auto bg-[#0d1117] p-6">
