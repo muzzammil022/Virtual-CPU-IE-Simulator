@@ -93,11 +93,11 @@ export default function FPSModule() {
         // Mix of patterns: gradients, noise, moving shapes
         const pattern1 = Math.sin((x + frame) / 20) * 127 + 128;
         const pattern2 = Math.cos((y - frame) / 15) * 127 + 128;
-        const noise = Math.random() * 40;
+        const noiseVal = Math.random() * 40;
 
-        data[i] = pattern1; // R
-        data[i + 1] = pattern2; // G
-        data[i + 2] = (pattern1 + pattern2) / 2; // B
+        data[i] = Math.max(0, Math.min(255, pattern1 + noiseVal * 0.1)); // R
+        data[i + 1] = Math.max(0, Math.min(255, pattern2 - noiseVal * 0.1)); // G
+        data[i + 2] = Math.max(0, Math.min(255, (pattern1 + pattern2) / 2)); // B
         data[i + 3] = 255; // A
       }
 
@@ -173,16 +173,16 @@ export default function FPSModule() {
       // Extract timing from PATEMU results
       if (data.patemu?.stats) {
         const stats = data.patemu.stats;
-        // Assume 80 MHz clock for Patmos
-        const totalMs = (stats.cycles / 80_000_000) * 1000;
+        // 80 MHz clock: cycles to milliseconds = cycles / 80,000
+        const totalMs = (stats.cycles / 80_000); // More precise than (cycles / 80_000_000) * 1000
         const frameTime = totalMs / frameCount;
 
         return {
           frameCount,
           totalTime: totalMs,
           fps: (1000 * frameCount) / totalMs,
-          minTime: frameTime * 0.95, // Estimate
-          maxTime: frameTime * 1.05,
+          minTime: frameTime * 0.95, // Estimate (Patmos is deterministic)
+          maxTime: frameTime * 1.05, // Estimate
           avgTime: frameTime,
           stats,
         };

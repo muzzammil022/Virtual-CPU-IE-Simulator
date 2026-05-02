@@ -178,7 +178,7 @@ export default function RadarDashboard() {
     // ALWAYS use AVOIDANCE_TASK — Patmos is deterministic regardless of threat level
     const task: TaskProfile = AVOIDANCE_TASK;
 
-    // Patmos (PASIM) — DETERMINISTIC: always 542 cycles
+    // Patmos (PASIM) — Use real benchmark cycles if available, otherwise use model
     let patmos: TimingResult;
     if (realPasimCycles.current > 0) {
       const cycles = realPasimCycles.current;
@@ -196,7 +196,7 @@ export default function RadarDashboard() {
       patmos = computePatmosTiming(task);
     }
 
-    // Patemu (hardware emulator) — DETERMINISTIC: always 542 cycles
+    // Patemu (hardware emulator) — Use real benchmark cycles if available
     let patmu: TimingResult;
     if (realPatemuCycles.current > 0) {
       const cycles = realPatemuCycles.current;
@@ -211,7 +211,7 @@ export default function RadarDashboard() {
         breakdown: { base: cycles, cachePenalty: 0, branchPenalty: 0, osPenalty: 0 },
       };
     } else {
-      patmu = { ...patmos }; // Use same as patmos if not benchmarked
+      patmu = { ...patmos }; // Use Patmos if Patemu not available
     }
 
     // Normal CPU — NON-DETERMINISTIC: varies based on threat level
@@ -700,11 +700,18 @@ export default function RadarDashboard() {
             )}
             {hasBench && stats && (
               <div className="mt-1.5 space-y-1">
-                <div className="bg-[#1a3a5c]/20 border border-[#58a6ff]/30 rounded p-1.5">
-                  <div className="text-[8px] text-[#8b949e] mb-1">Hardware Emulator (cycle-accurate)</div>
-                  <div className="text-2xl font-bold text-[#d2a8ff] tabular-nums leading-tight">{fmt(patemuCyc)}</div>
-                  <div className="text-[8px] text-[#484f58]">execution cycles</div>
+                <div className="bg-[#1a3a5c]/20 border border-[#d2a8ff]/30 rounded p-1.5">
+                  <div className="text-[8px] text-[#8b949e] mb-1">PATEMU (Hardware Emulator)</div>
+                  <div className="text-2xl font-bold text-[#d2a8ff] tabular-nums leading-tight">{fmt(patemuCyc)} cyc</div>
+                  <div className="text-[8px] text-[#484f58]">cycle-accurate emulation result</div>
                 </div>
+                {pasimCyc > 0 && (
+                  <div className="bg-[#1a3a5c]/20 border border-[#58a6ff]/30 rounded p-1.5">
+                    <div className="text-[8px] text-[#8b949e] mb-1">PASIM (Fast Simulator)</div>
+                    <div className="text-xl font-bold text-[#58a6ff] tabular-nums leading-tight">{fmt(pasimCyc)} cyc</div>
+                    <div className="text-[8px] text-[#484f58]">fast simulation result</div>
+                  </div>
+                )}
                 <div className="border-t border-[#21262d] pt-1.5 space-y-1">
                   <StatRow label="Instructions" value={fmt(stats.instructions)} />
                   <StatRow label="Data Cache" value={`${stats.cache_hits}↑ / ${stats.cache_misses}↓`} />
@@ -729,12 +736,21 @@ export default function RadarDashboard() {
             <div className="text-[9px] text-[#8b949e] leading-relaxed space-y-1.5">
               <div className="bg-[#0d1117] border border-[#21262d] rounded p-1.5">
                 <div className="text-[8px] text-[#484f58] uppercase tracking-wider mb-1">Patmos Guarantee</div>
-                <div><span className="text-[#2ed573]">✓ Every run</span>: {hasBench ? `${patemuCyc}` : `${AVOIDANCE_TASK.N_instr}`} <span className="text-[8px]">cycles</span></div>
-                <div><span className="text-[8px] text-[#484f58]">No jitter, no OS overhead, no cache misses</span></div>
+                {hasBench ? (
+                  <>
+                    <div><span className="text-[#2ed573]">✓ Every run</span>: <span className="font-bold text-[#d2a8ff]">{fmt(patemuCyc)}</span> <span className="text-[8px]">cycles (from PATEMU)</span></div>
+                    <div><span className="text-[8px] text-[#484f58]">Zero jitter, guaranteed by architecture</span></div>
+                  </>
+                ) : (
+                  <>
+                    <div><span className="text-[#2ed573]">✓ Every run</span>: {AVOIDANCE_TASK.N_instr} <span className="text-[8px]">instructions</span></div>
+                    <div><span className="text-[8px] text-[#8b949e]">(real cycles pending benchmark)</span></div>
+                  </>
+                )}
               </div>
               <div className="text-[8px] text-[#484f58] space-y-1">
-                <div>✗ <span className="text-[#d29922]">CPU varies</span>: {NORMAL_CPU.osJitterRange[0]}–{NORMAL_CPU.osJitterRange[1]}+ cycles</div>
-                <div className="text-[7px] text-[#484f58]">Depends on: cache misses, branch prediction, OS scheduler, thermal throttling</div>
+                <div>✗ <span className="text-[#d29922]">CPU varies</span>: {NORMAL_CPU.osJitterRange[0]}–{NORMAL_CPU.osJitterRange[1]}+ cycles per run</div>
+                <div className="text-[7px] text-[#484f58]">Due to: cache misses, branch prediction, OS scheduler, thermal throttling</div>
               </div>
             </div>
           </PS>
